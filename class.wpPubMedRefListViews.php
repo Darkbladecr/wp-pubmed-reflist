@@ -1,203 +1,278 @@
 <?php
 
-class wpPubMedReflistViews{
+class wpPubMedReflistViews
+{
+    public function __construct()
+    {
+    }
 
-	function __construct(){
 
-	}
-	
+    public static function query_form_text()
+    {
+        echo '<p>Edit Queries. Queries can be any valid pubmed query, '.
+        'or you can use query keys as *key* and query text using || (two pipes) as an OR separator</p>'.
+        '<p>Extras is for citations of publications not listed in pubmed. Put formatted citations in this field, one citation per line</p>';
+    }
 
-	public static function query_form_text() {
-		echo '<p>Edit Queries. Queries can be any valid pubmed query, '.
-		'or you can use query keys as *key* and query text using || (two pipes) as an OR separator</p>'.
-		'<p>Extras is for citations of publications not listed in pubmed. Put formatted citations in this field, one citation per line</p>';
-	}
+    public static function faclist_text()
+    {
+        echo '<p>Add new search key.  Search keys are used to tell the shortcode what query '.
+        'to use and can be almost any arbitrary unquoted text. We use names of faculty members, '.
+        'or mnemonics for searches like "recent"</p>';
+    }
 
-	public static function faclist_text() {
-		echo '<p>Add new search key.  Search keys are used to tell the shortcode what query '.
-		'to use and can be almost any arbitrary unquoted text. We use names of faculty members, '.
-		'or mnemonics for searches like "recent"</p>';
-	}
-	
-	public static function styles_form_text(){
-		echo '<p>Add new styles by name.</p>';
-	}
+    public static function styles_form_text()
+    {
+        echo '<p>Add new styles by name.</p>';
+    }
 
-	public static function styles_data_form_text(){
-		echo '<p>Edit the formats used to display references</p>';
-	}
-	
-	public static function styles_ital_form_text(){
-		echo "List of items that should be <i>italicized</i> in article titles (e.g. species names). Enter one item per line";
-	}
+    public static function styles_data_form_text()
+    {
+        echo '<p>Edit the formats used to display references</p>';
+    }
 
-	public static function styles_bold_form_text(){
-		echo "List of items that should be get the html <strong>strong</strong> tag in article author lists (e.g. author names). Enter one item per line";
-	}
+    public static function styles_ital_form_text()
+    {
+        echo "List of items that should be <i>italicized</i> in article titles (e.g. species names). Enter one item per line";
+    }
 
-	public static function noFetchMethod(){
-		echo "<p><span style='color:red;'>WP Pubmed Reflist cannot find a method to fetch remote results from Pubmed.</span></p><p> Please check your PHP configuration and/or contact your hosting provider to see if either allow_url_fopen or curl can be used on your Wordpress installation</p>";
-	}
+    public static function styles_bold_form_text()
+    {
+        echo "List of items that should be get the html <strong>strong</strong> tag in article author lists (e.g. author names). Enter one item per line";
+    }
 
-	/*
-	Takes array of query results and formats based on a style
-	*/
-	public function format_refs($refs, $style, $wrap, $limit, $subset = 1){
-		$html = '';
-		$reflist = array();
-		$formats = get_option('wp_pubmed_reflist_styles');
-		if(!isset($formats['styleprops'][$style]['format'])){
-			$style = $formats['default_style'];
-		}	
-		$template = $formats['styleprops'][$style]['format'];
-		foreach ($refs['pmid'] as $ref){
-			$reference = $template;
-			# authorlist
-			$reference = str_replace('_Author', $this->authorlist($ref, $formats['styleprops'][$style]), $reference);
-			$reference = self::bold($reference, $formats);
-			# Epub date
-			$reference = str_replace('_Epub', $ref['EPub'], $reference);
-			# title
-			$ref['Title'] = self::italicize($ref['Title'], $formats);
-			# do _TitleL first or _Title will hit it.
-			# Links
-			$fields = array('_TitleL','_DOI','_PMIDL','_PMID','_PMCL', '_PMC');
-			foreach ($fields as $field){
-				$reference = str_replace($field, $this->links($ref, $field), $reference);
-			}
-			# other fields
-			$fields = array('_Year','_Title','_Journal','_Volume', '_Issue', '_Pages' );
-			foreach ($fields as $field){
-				$reference = str_replace( $field, $ref[trim($field,'_')], $reference);
-			}
-			# clean up some formatting issues
-			$reference = str_replace(array('..','. .','()'), array('.','.',''), $reference);
-			$reflist[] = $reference;
-		}
-		foreach($refs['extras'] as $extra){
-			if($extra != '') $reflist[] = $extra;
-		}
-		if ($limit < 0){	
-			$limit = abs($limit) - 1;
-			if(count($reflist) < $limit) $limit = count($reflist);
-			# slice the array to the number set by limit
-			$reflist = array_slice($reflist, 0, $limit);
-			# make sure $subset is <= $limit
-			$subset = min($subset, $limit);
-			# shuffle and take the subset
-			shuffle($reflist);
-			$reflist = array_slice($reflist, 0, $subset);
-		#	echo "<pre>".print_r($reflist, true)."</pre>subset:$subset limit:$limit";
-		}		
-		# wrap the references in $wrap
-		switch ($wrap){
-			case 'p':
-				$html = "<p>".implode("</p><p>", $reflist)."</p>";
-				break;
-			case 'ol':
-			case 'ul':
-			default:
-				$html = "<$wrap><li>".implode("</li><li>", $reflist)."</$wrap>";
-		}
-		return $html;
-	}
-	
-	function authorlist($ref, $styleprops){
-		if(	!isset($styleprops['authlimit']) || 
-			$styleprops['authlimit'] == '' ||
-			count($ref['AuthorList']) < $styleprops['authlimit']
-			){
-			return $ref['Authors'];
-		}
-		# else we have too many authors
-		$alimit = $styleprops['authlimit'];
-		$ashow = $alimit;
-		# overwrite $ashow if it's set
-		if(isset($styleprops['authshow']) && $styleprops['authshow'] != ''){
-			$ashow = $styleprops['authshow'];
-		}
-		$authorlist = array_slice($ref['AuthorList'], 0, $ashow);
-		return implode(', ', $authorlist)." <i>et al.</i>";
-	}
-	
-	function links($ref, $field){
-		$text = '';
-		$prefix = '';
-		switch($field){
-			case '_DOI':
-				if(isset($ref['xrefs']['doi'])){
-					$doi = $ref['xrefs']['doi'];			
-					$text = "doi: <a href='http://dx.doi.org/$doi'>$doi</a>";
-				}
-				break;
-			case '_PMIDL':
-				$prefix = 'PubMed ';
-			case '_PMID':
-				if(isset($ref['PMID'])){
-					# should never evaluate false, since the refs are from pubmed, but just in case
-					$pmid = $ref['PMID'];			
-					$text = "$prefix<a href='http://www.ncbi.nlm.nih.gov/pubmed/$pmid'>PMID:$pmid</a>";
-				}
-				break;	
-			case '_PMCL':
-				$prefix = 'PubMed Central ';
-			case '_PMC':
-				if(isset($ref['xrefs']['pmc'])){
-					$pmcid = $ref['xrefs']['pmc'];			
-					$text = "$prefix<a href='http://www.ncbi.nlm.nih.gov/pmc/articles/$pmcid'>$pmcid</a>";
-				}
-				break;	
-			case '_TitleL':	
-				if(isset($ref['PMID'])){
-					# should never evaluate false, since the refs are from pubmed, but just in case
-					$pmid = $ref['PMID'];			
-					$text = "<a href='http://www.ncbi.nlm.nih.gov/pubmed/$pmid'>".$ref['Title']."</a>";
-				}else{
-					$text = $ref['Title'];
-				}
-			
-		}
-		return $text;
-	}
-	/*
-	italicize specified strings, e.g. species names
-	*/
-	static function italicize($text, $formats){
-	#	echo "<br>".__METHOD__."<br><pre>".print_r($formats, true)."</pre><br>";
-		$ital_list = explode("\n", $formats['itals']);
-		foreach ($ital_list as $ital_item){
-			$ital_item = trim($ital_item);
-			if($ital_item == '') continue;
-			$text = str_replace("$ital_item", "<i>$ital_item</i>", $text );
-		}
-		return $text;
-	}
-	
-	/*
-	boldface specified strings, e.g. specific authors
-	*/
-	static function bold($text, $formats){
-		$bold_list = explode("\n", $formats['bold']);
-		#echo "<br>".__METHOD__."<br><pre>".print_r($bold_list, true)."</pre><br>";
-		foreach ($bold_list as $bold_item){
-			$bold_item = trim($bold_item);
-			if($bold_item == '') continue;
-			$text = str_replace("$bold_item", "<strong>$bold_item</strong>", $text );
-		}
-		return $text;
-	}
-	
-	/*
-	Display the help tab
-	'limit'         => '',
-	'style'         => '',
-	'wrap'         => 'ol',
-	'linktext'	=> 'Search PubMed',
-	'showlink' => ''
+    public static function noFetchMethod()
+    {
+        echo "<p><span style='color:red;'>WP Pubmed Reflist cannot find a method to fetch remote results from Pubmed.</span></p><p> Please check your PHP configuration and/or contact your hosting provider to see if either allow_url_fopen or curl can be used on your Wordpress installation</p>";
+    }
 
-	*/
-	public static function help(){
-		echo "
+    /*
+    Takes array of query results and formats based on a style
+    */
+    public function format_refs($refs, $style, $wrap, $limit, $subset = 1)
+    {
+        $html = '';
+        $reflist = array();
+        $formats = get_option('wp_pubmed_reflist_styles');
+        if (!isset($formats['styleprops'][$style]['format'])) {
+            $style = $formats['default_style'];
+        }
+        $template = $formats['styleprops'][$style]['format'];
+        foreach ($refs['pmid'] as $ref) {
+            $reference = $template;
+            # authorlist
+            $reference = str_replace('_Author', $this->authorlist($ref, $formats['styleprops'][$style]), $reference);
+            $reference = self::bold($reference, $formats);
+            # Epub date
+            $reference = str_replace('_Epub', $ref['EPub'], $reference);
+            # title
+            $ref['Title'] = self::italicize($ref['Title'], $formats);
+            # do _TitleL first or _Title will hit it.
+            # Links
+            $fields = array('_TitleL','_DOI','_PMIDL','_PMID','_PMCL', '_PMC');
+            foreach ($fields as $field) {
+                $reference = str_replace($field, $this->links($ref, $field), $reference);
+            }
+            # other fields
+            $fields = array('_Year','_Title','_Journal','_Volume', '_Issue', '_Pages' );
+            foreach ($fields as $field) {
+                $reference = str_replace($field, $ref[trim($field, '_')], $reference);
+            }
+            # clean up some formatting issues
+            $reference = str_replace(array('..','. .','()'), array('.','.',''), $reference);
+            $reflist[] = $reference;
+        }
+        foreach ($refs['extras'] as $extra) {
+            if ($extra != '') {
+                $reflist[] = $extra;
+            }
+        }
+        if ($limit < 0) {
+            $limit = abs($limit) - 1;
+            if (count($reflist) < $limit) {
+                $limit = count($reflist);
+            }
+            # slice the array to the number set by limit
+            $reflist = array_slice($reflist, 0, $limit);
+            # make sure $subset is <= $limit
+            $subset = min($subset, $limit);
+            # shuffle and take the subset
+            shuffle($reflist);
+            $reflist = array_slice($reflist, 0, $subset);
+        #	echo "<pre>".print_r($reflist, true)."</pre>subset:$subset limit:$limit";
+        }
+        $reflist = $this->sortByYear($reflist);
+        $reflist = $this->addYears($reflist);
+        # wrap the references in $wrap
+        switch ($wrap) {
+            case 'p':
+                $html = "<p>".implode("</p><p>", $reflist)."</p>";
+                break;
+            case 'ol':
+            case 'ul':
+            default:
+                $html = "<$wrap><li>".implode("</li><li>", $reflist)."</$wrap>";
+        }
+        return $html;
+    }
+
+    public function sortByYear($arr)
+    {
+        $re = "/(\\d{4})(?=;)/";
+        $data = array();
+        foreach ($arr as $ref) {
+            preg_match($re, $ref, $matches);
+            if (array_key_exists($matches[0], $data)) {
+                array_push($data[$matches[0]], $ref);
+            } else {
+                $data[$matches[0]] = array($ref);
+            }
+        }
+        $arr = array();
+        foreach ($data as $ref) {
+            for ($i=0;$i<count($ref);$i++) {
+                array_push($arr, $ref[$i]);
+            }
+        }
+        return $arr;
+    }
+
+    public function addYears($arr)
+    {
+        $re = "/(\\d{4})(?=;)/";
+        $years = array();
+        $temp;
+        for ($x = 0; $x < count($arr); $x++) {
+            preg_match($re, $arr[$x], $matches);
+            if ($x==0) {
+                $temp = $matches[0];
+                $years[$x] = "</p><h3>".$matches[0]."</h3><p>";
+            }
+            if ($temp > $matches[0]) {
+                $temp = $matches[0];
+                $years[$x] = "</p><h3>".$matches[0]."</h3><p>";
+            }
+        }
+        $res = array();
+        $years = array_reverse($years, true);
+        $prev_key = null;
+        foreach ($years as $key=>$value) {
+            if ($prev_key) {
+                $cut = array_reverse(array_slice($arr, $key, $prev_key - $key));
+            } else {
+                $cut = array_reverse(array_slice($arr, $key));
+            }
+            $prev_key = $key;
+            $res = array_merge($res, $cut, array($value));
+        }
+        return array_reverse($res);
+    }
+
+    public function authorlist($ref, $styleprops)
+    {
+        if (!isset($styleprops['authlimit']) ||
+            $styleprops['authlimit'] == '' ||
+            count($ref['AuthorList']) < $styleprops['authlimit']
+            ) {
+            return $ref['Authors'];
+        }
+        # else we have too many authors
+        $alimit = $styleprops['authlimit'];
+        $ashow = $alimit;
+        # overwrite $ashow if it's set
+        if (isset($styleprops['authshow']) && $styleprops['authshow'] != '') {
+            $ashow = $styleprops['authshow'];
+        }
+        $authorlist = array_slice($ref['AuthorList'], 0, $ashow);
+        return implode(', ', $authorlist)." <i>et al.</i>";
+    }
+
+    public function links($ref, $field)
+    {
+        $text = '';
+        $prefix = '';
+        switch ($field) {
+            case '_DOI':
+                if (isset($ref['xrefs']['doi'])) {
+                    $doi = $ref['xrefs']['doi'];
+                    $text = "doi: <a href='http://dx.doi.org/$doi'>$doi</a>";
+                }
+                break;
+            case '_PMIDL':
+                $prefix = 'PubMed ';
+            case '_PMID':
+                if (isset($ref['PMID'])) {
+                    # should never evaluate false, since the refs are from pubmed, but just in case
+                    $pmid = $ref['PMID'];
+                    $text = "$prefix<a href='http://www.ncbi.nlm.nih.gov/pubmed/$pmid'>PMID:$pmid</a>";
+                }
+                break;
+            case '_PMCL':
+                $prefix = 'PubMed Central ';
+            case '_PMC':
+                if (isset($ref['xrefs']['pmc'])) {
+                    $pmcid = $ref['xrefs']['pmc'];
+                    $text = "$prefix<a href='http://www.ncbi.nlm.nih.gov/pmc/articles/$pmcid'>$pmcid</a>";
+                }
+                break;
+            case '_TitleL':
+                if (isset($ref['PMID'])) {
+                    # should never evaluate false, since the refs are from pubmed, but just in case
+                    $pmid = $ref['PMID'];
+                    $text = "<a href='http://www.ncbi.nlm.nih.gov/pubmed/$pmid'>".$ref['Title']."</a>";
+                } else {
+                    $text = $ref['Title'];
+                }
+
+        }
+        return $text;
+    }
+    /*
+    italicize specified strings, e.g. species names
+    */
+    public static function italicize($text, $formats)
+    {
+        #	echo "<br>".__METHOD__."<br><pre>".print_r($formats, true)."</pre><br>";
+        $ital_list = explode("\n", $formats['itals']);
+        foreach ($ital_list as $ital_item) {
+            $ital_item = trim($ital_item);
+            if ($ital_item == '') {
+                continue;
+            }
+            $text = str_replace("$ital_item", "<i>$ital_item</i>", $text);
+        }
+        return $text;
+    }
+
+    /*
+    boldface specified strings, e.g. specific authors
+    */
+    public static function bold($text, $formats)
+    {
+        $bold_list = explode("\n", $formats['bold']);
+        #echo "<br>".__METHOD__."<br><pre>".print_r($bold_list, true)."</pre><br>";
+        foreach ($bold_list as $bold_item) {
+            $bold_item = trim($bold_item);
+            if ($bold_item == '') {
+                continue;
+            }
+            $text = str_replace("$bold_item", "<strong>$bold_item</strong>", $text);
+        }
+        return $text;
+    }
+
+    /*
+    Display the help tab
+    'limit'         => '',
+    'style'         => '',
+    'wrap'         => 'ol',
+    'linktext'	=> 'Search PubMed',
+    'showlink' => ''
+
+    */
+    public static function help()
+    {
+        echo "
 	<h2>Using the pmid-refs shortcode</h2>
 	<p>The [pmid-refs] shortcode has one required parameter and several optional ones</p>
 	<ul>
@@ -222,7 +297,7 @@ class wpPubMedReflistViews{
 	<tr><td>[pmid-refs key=smith_jbc showlink='false'][pmid-refs key=smith showlink='link only']</td><td>By combining two shortcodes where the showlink is different, you can display the results of one query (e.g. just Smith's papers in JBC) while linking to a different PubMed search (e.g. all of Smith's papers)</td></tr>
 	</table>
 
-	
+
 	<h2>Managing queries</h2>
 	<p>Query management is done under the Queries tab. There are two sections to that form. One allows you to add new query keys, the other sets information associated with that key, or delete an entry</p>
 	<h3>Keys</h3>
@@ -239,7 +314,7 @@ class wpPubMedReflistViews{
 	<h3>Extras</h3>
 	<p>Sometimes you want to include a reference that is not indexed in PubMed. Add these, one per line, to the extras field in the format you want to use for display. Note that we use this sparingly, as the extras will ignore the style specifications. What you enter is what you get.</p>
 	<h2>Managing output styles</h2>
-	<p>Starting with version 0.7, WP PubMed Reflist allows you to create styles for how references will be displayed. The plugin comes with several formats preinstalled. The default style can be selected or styles can be specified in the shorttag parameters</p>	
+	<p>Starting with version 0.7, WP PubMed Reflist allows you to create styles for how references will be displayed. The plugin comes with several formats preinstalled. The default style can be selected or styles can be specified in the shorttag parameters</p>
 	<h3>Formatting codes</h3>
 	The styles are templates where special codes are replaced by specified content. Each of the formatting codes starts with a _ so it won't interfere with normal text in your template. The following codes are available (most have pretty obvious meanings).
 <table border ='1'>
@@ -257,8 +332,8 @@ class wpPubMedReflistViews{
 <tr><td>_PMIDL</td><td>PMID link with PubMed prefix label. </td><tr>
 <tr><td>_PMC</td><td>unlabeled Pubmed Central link</td><tr>
 <tr><td>_PMCL</td><td>labeled Pubmed Central link</td><tr>
-</table>	
-	
+</table>
+
 	<h3>Author lists</h3>
 	<p>Styles can set how many authors to display before using <i>et al.</i>. There are two numbers that control this: a <b>limit</b> and a <b>show</b> number. If the display number is not set, the maximum number of authors shown will be the same as the limit. </p>
 	<h3>Italicizing keywords</h3>
@@ -270,6 +345,5 @@ class wpPubMedReflistViews{
 	<h2>Donate</h2>
 	If this plugin is useful to you please send a donation to the Biochemistry/Biophysics improvement fund for the Dept. of Biochemistry and Biophysics at Texas A&M. Donations can be made through the <a href='http://txamfoundation.com/s/1436/gid3give/2014/start.aspx?gid=3&pgid=61'>Texas A&M Foundation</a>. It won't give me more time to work on the plugin, but it's tax-deductible and it will go to some other worthy activity.
 	";
-	}
-
+    }
 }

@@ -13,7 +13,7 @@ Plugin to use a pubmed query to generate a reference list on a page
 == Description ==
 
 This plugin uses a pubmed query to generate a reference list on a page. It provides an admin page
-where you can associate PubMed queries with keys and a shorttag that allows you to display a 
+where you can associate PubMed queries with keys and a shorttag that allows you to display a
 list of references based on any of your keys on a page or post.
 
 This plugin was developed for use on the website for the Department of Biochemistry and Biophysics
@@ -31,7 +31,7 @@ at Texas A&M University (http://biochemistry.tamu.edu).
 For Query syntax
 See: http://www.ncbi.nlm.nih.gov/books/NBK3830/
 = Can I combine saved queries =
-Yes. use double pipes to combine other queries using their named keys. 
+Yes. use double pipes to combine other queries using their named keys.
 The plugin will combine the two queries with a logical OR
 = Can I display a random reference based on my query =
 Yes. Use negative limit to pick one random reference from a list of abs[$limit]
@@ -42,7 +42,7 @@ time.
 = Your donate link seems odd. How do I support this plugin =
 This plugin was developed as part of my work for the Department of Biochemistry and Biophysics
 at Texas A&M. Donating won't lead me to give up my day job to spend more time on plugin
-development. But if you want to donate out of gratitude/niceness, give whatever you think 
+development. But if you want to donate out of gratitude/niceness, give whatever you think
 would be appropriate to the Biochemistry/Biophysics improvement fund. It's tax-deductible
 and it will go to some other worthy activity.
 = Are these questions really frequently asked? =
@@ -90,7 +90,7 @@ added the ability to construct complex queries using other keys.
 	e.g.
 		smith => smith j[au] AND escherichia coli[majr]
 		jones => jones jp[au] AND enzyme
-		smith_jones = smith || jones 
+		smith_jones = smith || jones
 			= (smith j[au] AND escherichia coli[majr])OR(jones jp[au] AND enzyme)
 = 0.2 =
 * convert to OO
