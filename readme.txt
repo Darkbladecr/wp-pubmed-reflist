@@ -57,6 +57,8 @@ n/a
 TODO:
 * input validation for the admin page
 * jquery datatables for settings view
+= 1.1 = by Darkbladecr
+* Add years to the publication list
 = 1.0 =
 * Add ability to select more than one reference at random
 * Add strong emphasis for specific authors
